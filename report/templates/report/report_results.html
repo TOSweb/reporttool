@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% load static %}
+{% load report_tags %}
+
+{% block title %}{{ report.name }} - Results{% endblock %}
+
+{% block extra_css %}
+<style>
+    .results-container {
+        padding: 2rem;
+    }
+    .results-header {
+        margin-bottom: 2rem;
+    }
+    .results-table {
+        width: 100%;
+        background: #fff;
+        border: 1px solid #e9ecef;
+        margin-bottom: 1rem;
+    }
+    .results-table th {
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 500;
+    }
+    .results-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .results-table tr:last-child td {
+        border-bottom: none;
+    }
+    .group-row {
+        background-color: #f8f9fa;
+        font-weight: 500;
+    }
+    .pagination-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fff;
+        padding: 0.75rem;
+        border: 1px solid #e9ecef;
+    }
+    .pagination {
+        margin: 0;
+    }
+    .results-actions {
+        margin-bottom: 1rem;
+    }
+    .aggregation-cell {
+        font-weight: 500;
+        color: #495057;
+    }
+    .grand-total-row {
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+    .error-message {
+        padding: 1rem;
+        margin: 1rem 0;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 0.25rem;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="results-container">
+    <div class="results-header">
+        <h2>{{ report.name }}</h2>
+        <p class="text-muted">Report Results</p>
+        {% if report.groupings.exists %}
+        <div class="grouping-info alert alert-info">
+            <i class="fas fa-layer-group"></i> Grouped by: 
+            {% for group in report.groupings.all %}
+                {% if not forloop.first %} → {% endif %}
+                {{ group.field_path }}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="results-actions">
+        <button class="btn btn-outline-secondary" onclick="window.print()">
+            <i class="fas fa-print"></i> Print
+        </button>
+        <button class="btn btn-outline-secondary" onclick="exportToExcel()">
+            <i class="fas fa-file-excel"></i> Export to Excel
+        </button>
+        {% if report and report.id %}
+        <a href="{% url 'report:report_builder' pk=report.id %}" class="btn btn-outline-primary">
+            <i class="fas fa-edit"></i> Edit Report
+        </a>
+        {% endif %}
+    </div>
+
+    {% if error %}
+    <div class="error-message">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    {% if data %}
+    <div class="table-responsive">
+        <table class="results-table">
+            <thead>
+                <tr>
+                    {% for column in visible_columns %}
+                    <th>{{ column.display_name }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data %}
+                <tr>
+                    {% for column in visible_columns %}
+                    <td>
+                        {% with value=row|get_dict_value:column.field_path %}
+                        {% if value != None %}
+                            {% if column.formatting_type %}
+                                {{ value|format_value:column }}
+                            {% else %}
+                                {{ value }}
+                            {% endif %}
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{{ visible_columns|length }}" class="text-center">
+                        No results found.
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if grand_totals %}
+                <tr class="grand-total-row">
+                    {% for column in visible_columns %}
+                    <td>
+                        {% with total=grand_totals|get_dict_value:column.field_path %}
+                        {% if total != None %}
+                            {% if column.formatting_type %}
+                                {{ total|format_value:column }}
+                            {% else %}
+                                {{ total }}
+                            {% endif %}
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination-controls">
+        <div class="pagination-info">
+            Showing {{ start_index }} to {{ end_index }} of {{ total }} entries
+        </div>
+        <nav aria-label="Table navigation">
+            <ul class="pagination mb-0">
+                {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page|add:'-1' }}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for num in page_range %}
+                    {% if num == page %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page|add:'1' }}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> No results found.
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function exportToExcel() {
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = window.location.href;
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'export';
+    input.value = 'excel';
+    form.appendChild(input);
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+</script>
+{% endblock %} 

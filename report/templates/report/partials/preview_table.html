@@ -1,0 +1,369 @@
+{% load report_tags %}
+
+<style>
+.sort-message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 4px;
+    z-index: 1050;
+    display: none;
+    animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.group-row td {
+    background-color: #f8f9fa;
+    font-weight: 500;
+}
+
+.aggregation-cell {
+    font-weight: 500;
+    color: #0d6efd;
+}
+
+.group-indicator {
+    color: #6c757d;
+    margin-right: 0.5rem;
+}
+
+.group-level-0 td { padding-left: 0.75rem; }
+.group-level-1 td { padding-left: 1.5rem; }
+.group-level-2 td { padding-left: 2.25rem; }
+.group-level-3 td { padding-left: 3rem; }
+
+/* Column header styles */
+.preview-table th {
+    padding: 0 !important;
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.column-header {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    transition: all 0.2s;
+    min-height: 50px;
+}
+
+.column-header:hover {
+    background-color: #e9ecef;
+}
+
+.sort-handle {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    margin-right: 0.5rem;
+    cursor: grab;
+    color: #adb5bd;
+}
+
+.sort-handle:hover {
+    color: #6c757d;
+}
+
+.sort-handle i {
+    font-size: 1rem;
+}
+
+.column-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.column-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.column-header:hover .column-actions {
+    opacity: 1;
+}
+
+.column-actions .btn {
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    line-height: 1;
+    color: #6c757d;
+}
+
+.column-actions .btn:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+
+.column-actions .btn.text-danger:hover {
+    background-color: #dc3545;
+    color: white !important;
+}
+
+.dragging {
+    opacity: 0.7;
+    background: #e9ecef !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.drag-over {
+    position: relative;
+}
+
+.drag-over::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: #0d6efd;
+}
+
+/* Add new styles for column headers */
+.column-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    transition: background-color 0.2s;
+}
+
+.column-header:hover {
+    background-color: #e9ecef;
+}
+
+.column-header .sort-handle {
+    cursor: grab;
+    color: #adb5bd;
+    padding: 0.25rem;
+    margin-right: 0.5rem;
+}
+
+.column-header .sort-handle:hover {
+    color: #6c757d;
+}
+
+.column-header.dragging {
+    opacity: 0.7;
+    background: #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.column-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.column-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.column-header:hover .column-actions {
+    opacity: 1;
+}
+
+.column-actions .btn {
+    padding: 0.25rem;
+    line-height: 1;
+    border-radius: 0.25rem;
+}
+
+.column-actions .btn:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+.column-actions .btn.text-danger:hover {
+    background-color: #dc3545;
+    color: white !important;
+}
+</style>
+
+<div class="sort-message" id="sortMessage"></div>
+
+{% if preview_data %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                {% for column in report.columns.all %}
+                    {% if column.is_visible %}
+                    <th>
+                        <div class="d-flex align-items-center">
+                            {{ column.display_name }}
+                            {% if column.is_sortable %}
+                            <div class="ms-2">
+                                <a href="#" class="sort-link" data-field="{{ column.field_path }}" data-direction="asc">
+                                    <i class="fas fa-sort-up {% if sort_field == column.field_path and sort_direction == 'asc' %}text-primary{% else %}text-muted{% endif %}"></i>
+                                </a>
+                                <a href="#" class="sort-link" data-field="{{ column.field_path }}" data-direction="desc">
+                                    <i class="fas fa-sort-down {% if sort_field == column.field_path and sort_direction == 'desc' %}text-primary{% else %}text-muted{% endif %}"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </th>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in preview_data %}
+                <tr {% if row.is_group_row %}class="table-group-row"{% endif %}>
+                    {% for column in report.columns.all %}
+                        {% if column.is_visible %}
+                            <td>
+                                {% with value=row|get_dict_value:column.field_path %}
+                                    {% if value != None %}
+                                        {% if column.formatting_type %}
+                                            {{ value|format_value:column }}
+                                        {% else %}
+                                            {{ value }}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="{{ report.columns.all|length }}" class="text-center">
+                        No data available
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+        {% if preview_data.grand_totals %}
+        <tfoot>
+            <tr class="table-info">
+                {% for column in report.columns.all %}
+                    {% if column.is_visible %}
+                        <td>
+                            {% with total=preview_data.grand_totals|get_dict_value:column.field_path %}
+                                {% if total != None %}
+                                    {% if column.formatting_type %}
+                                        {{ total|format_value:column }}
+                                    {% else %}
+                                        {{ total }}
+                                    {% endif %}
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+{% if preview_data.paginator.num_pages > 1 %}
+<nav aria-label="Page navigation" class="mt-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="page-size-selector">
+            <label for="page-size">Rows per page:</label>
+            <select id="page-size" class="form-select form-select-sm d-inline-block w-auto ms-2">
+                <option value="10" {% if preview_data.paginator.per_page == 10 %}selected{% endif %}>10</option>
+                <option value="25" {% if preview_data.paginator.per_page == 25 %}selected{% endif %}>25</option>
+                <option value="50" {% if preview_data.paginator.per_page == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if preview_data.paginator.per_page == 100 %}selected{% endif %}>100</option>
+            </select>
+        </div>
+        
+        <ul class="pagination mb-0">
+            {% if preview_data.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="#" data-page="1" aria-label="First">
+                        <span aria-hidden="true">&laquo;&laquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="#" data-page="{{ preview_data.previous_page_number }}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">&laquo;&laquo;</span>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">&laquo;</span>
+                </li>
+            {% endif %}
+
+            {% for i in preview_data.paginator.page_range %}
+                {% if preview_data.number == i %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ i }}</span>
+                    </li>
+                {% elif i > preview_data.number|add:"-3" and i < preview_data.number|add:"3" %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" data-page="{{ i }}">{{ i }}</a>
+                    </li>
+                {% elif i == 1 or i == preview_data.paginator.num_pages %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" data-page="{{ i }}">{{ i }}</a>
+                    </li>
+                {% elif i == preview_data.number|add:"-3" or i == preview_data.number|add:"3" %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if preview_data.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="#" data-page="{{ preview_data.next_page_number }}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="#" data-page="{{ preview_data.paginator.num_pages }}" aria-label="Last">
+                        <span aria-hidden="true">&raquo;&raquo;</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">&raquo;</span>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">&raquo;&raquo;</span>
+                </li>
+            {% endif %}
+        </ul>
+        
+        <div class="page-info">
+            Showing {{ preview_data.start_index }} to {{ preview_data.end_index }} of {{ preview_data.paginator.count }} entries
+        </div>
+    </div>
+</nav>
+{% endif %}
+{% else %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-0">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>
+        <strong>No records found with current filters.</strong>
+        <p class="mb-0">The last filter you applied resulted in no matching records. Try removing it using the <i class="fas fa-times text-danger"></i> button next to the filter.</p>
+    </div>
+</div>
+{% endif %} 

@@ -1,0 +1,2662 @@
+{% extends "base.html" %}
+{% load static %}
+{% load report_tags %}
+
+{% block title %}{{ report.name }} - Report Builder{% endblock %}
+
+{% block extra_css %}
+<!-- Add Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .report-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: #f8f9fa;
+    }
+    .report-header {
+        background: #fff;
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .report-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        background: #fff;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .search-wrapper {
+        position: relative;
+        width: 300px;
+    }
+    .search-wrapper input {
+        width: 100%;
+        padding: 0.375rem 2rem 0.375rem 0.75rem;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
+    .search-wrapper .clear-btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+    }
+    .toolbar-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .report-content {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+    .sidebar {
+        width: 300px;
+        background: #fff;
+        border-right: 1px solid #e9ecef;
+        display: flex;
+        flex-direction: column;
+    }
+    .field-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+    .field-group {
+        border-bottom: 1px solid #e9ecef;
+    }
+    .field-group-header {
+        padding: 0.75rem 1rem;
+        font-weight: 500;
+        background: #f8f9fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+    }
+    .field-items {
+        padding: 0.5rem 0;
+        display: none;  /* Start collapsed */
+    }
+    .field-subitem {
+        padding-left: 1.5rem;
+        border-left: 2px solid #e9ecef;
+    }
+    .field-relation {
+        color: #6c757d;
+        font-size: 0.9em;
+        margin-top: 0.25rem;
+    }
+    .filter-badge {
+        font-size: 0.75em;
+        padding: 0.25em 0.5em;
+        background: #e9ecef;
+        border-radius: 1rem;
+        margin-left: 0.5rem;
+    }
+    .filter-modal .modal-dialog {
+        max-width: 600px;
+    }
+    .filter-value-input {
+        display: none;
+    }
+    .filter-value-input.active {
+        display: block;
+    }
+    .field-item {
+        padding: 0.375rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .field-name {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .content-area {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+    }
+    .preview-table {
+        width: 100%;
+        background: #fff;
+        border: 1px solid #e9ecef;
+    }
+    .preview-table th {
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 500;
+    }
+    .preview-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .preview-table tr:last-child td {
+        border-bottom: none;
+    }
+    .column-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border-bottom: 2px solid #dee2e6;
+        cursor: move; /* Show move cursor */
+    }
+
+    .column-header.dragging {
+        opacity: 0.5;
+        background: #f8f9fa;
+    }
+
+    .column-header.drag-over {
+        border-left: 2px solid #0d6efd;
+    }
+
+    .column-header .sort-handle {
+        cursor: move;
+        color: #adb5bd;
+    }
+    .auto-update-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+    }
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 20px;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 20px;
+    }
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 2px;
+        bottom: 2px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+        background-color: #2196F3;
+    }
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(20px);
+    }
+    .active-filters {
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .active-filter-item {
+        transition: all 0.2s ease;
+    }
+    
+    .active-filter-item:hover {
+        background-color: #f8f9fa !important;
+    }
+    
+    .filter-field {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    
+    .filter-details {
+        font-size: 0.85rem;
+    }
+    
+    .delete-filter:hover {
+        transform: scale(1.1);
+    }
+
+    .pagination-controls {
+        background: #fff;
+        padding: 0.75rem;
+        border: 1px solid #e9ecef;
+        border-top: none;
+    }
+
+    .pagination {
+        margin-left: 1rem;
+    }
+
+    .pagination .page-link {
+        padding: 0.375rem 0.75rem;
+        color: #6c757d;
+        border-color: #e9ecef;
+    }
+
+    .pagination .page-item.active .page-link {
+        background-color: #6c757d;
+        border-color: #6c757d;
+        color: #fff;
+    }
+
+    .pagination .page-link:hover {
+        background-color: #e9ecef;
+        border-color: #dee2e6;
+        color: #495057;
+    }
+
+    .pagination-info {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+
+    .fa-sort-up { color: #0d6efd; }
+    .fa-sort-down { color: #0d6efd; }
+    .sort-column:hover .fa-sort { opacity: 0.7; }
+
+    /* Add new styles for grouping and aggregation */
+    .grouping-section,
+    .aggregation-section {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 0.25rem;
+        margin-bottom: 1rem;
+    }
+    .section-header {
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        font-weight: 500;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .section-content {
+        padding: 0.75rem;
+    }
+    .group-item,
+    .aggregation-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem;
+        border: 1px solid #e9ecef;
+        border-radius: 0.25rem;
+        margin-bottom: 0.5rem;
+    }
+    .group-item:last-child,
+    .aggregation-item:last-child {
+        margin-bottom: 0;
+    }
+    .item-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+    .drag-handle {
+        cursor: move;
+        color: #6c757d;
+        margin-right: 0.5rem;
+    }
+    .group-row {
+        cursor: pointer;
+    }
+    .group-row:hover {
+        background-color: #e9ecef !important;
+    }
+    .group-row td {
+        border-top: 2px solid #dee2e6;
+    }
+    .group-row:not(.expanded) td {
+        border-bottom: 2px solid #dee2e6;
+    }
+    .group-row {
+        cursor: pointer;
+        border-top: 2px solid #dee2e6;
+    }
+    .group-row:hover {
+        background-color: #f8f9fa !important;
+    }
+    .group-row .group-toggle {
+        transition: transform 0.2s;
+    }
+    .group-row.collapsed .group-toggle {
+        transform: rotate(-90deg);
+    }
+    .group-row.collapsed + .detail-row,
+    .group-row.collapsed + .group-subtotal {
+        display: none;
+    }
+    .group-subtotal {
+        border-bottom: 2px solid #dee2e6;
+    }
+    .grand-total {
+        border-top: 2px solid #dee2e6;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .group-aggregate {
+        color: #666;
+        font-weight: 500;
+    }
+
+    /* Add Excel-like styling */
+    .column-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .column-title {
+        font-weight: 600;
+        margin-right: 0.5rem;
+    }
+
+    .column-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .column-controls .btn {
+        padding: 0.25rem;
+        color: #6c757d;
+    }
+
+    .column-controls .btn:hover {
+        color: #000;
+        background-color: #e9ecef;
+    }
+
+    .dropdown-menu {
+        padding: 0.5rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .dropdown-header {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #6c757d;
+    }
+
+    .dropdown-item {
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .dropdown-item i {
+        width: 1rem;
+        text-align: center;
+    }
+
+    /* Active states for grouped/aggregated columns */
+    .column-header.is-grouped {
+        background-color: #e9ecef;
+    }
+
+    .column-header.has-aggregation {
+        background-color: #f8f9fa;
+    }
+
+    .report-table th {
+        position: relative;
+        padding-right: 20px;
+        cursor: pointer;
+    }
+
+    .report-table th:hover {
+        background-color: #f8f9fa;
+    }
+
+    .sort-icon {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.5;
+    }
+
+    .sort-icon.active {
+        opacity: 1;
+    }
+
+    .subtotal-row {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+
+    /* Add new styles for formula fields */
+    .formula-field {
+        background-color: #e3f2fd;
+        border-left: 3px solid #2196f3;
+    }
+
+    .formula-preview {
+        font-family: monospace;
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+
+    .field-placeholder {
+        display: inline-block;
+        padding: 0.1rem 0.3rem;
+        background: #e9ecef;
+        border-radius: 0.2rem;
+        font-size: 0.85em;
+        margin: 0 0.2rem;
+        cursor: pointer;
+    }
+
+    /* Enhanced column header styles */
+    .preview-table th {
+        padding: 0;
+        background: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .column-header {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        cursor: move;
+    }
+
+    .column-header .sort-handle {
+        display: inline-block;
+        padding: 0.25rem;
+        margin-right: 0.5rem;
+        cursor: grab;
+        color: #adb5bd;
+    }
+
+    .column-header .sort-handle:hover {
+        color: #6c757d;
+    }
+
+    .column-info {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .column-actions {
+        display: flex;
+        gap: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .column-header:hover .column-actions {
+        opacity: 1;
+    }
+
+    .column-actions .btn {
+        padding: 0.25rem;
+        font-size: 0.875rem;
+        line-height: 1;
+        border: none;
+        background: transparent;
+    }
+
+    .column-actions .btn:hover {
+        background-color: rgba(0,0,0,0.05);
+    }
+
+    .column-actions .btn.text-danger:hover {
+        background-color: #dc3545;
+        color: white !important;
+    }
+
+    .dragging {
+        opacity: 0.5;
+        background: #e9ecef;
+    }
+
+    .drag-over {
+        border-left: 2px solid #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-container">
+    {% csrf_token %}
+    <div class="report-header">
+        <h4 class="mb-0">{{ report.name }}</h4>
+    </div>
+    
+    <div class="report-toolbar">
+        <div class="search-wrapper">
+            <input type="text" id="field-search" placeholder="Search all fields...">
+            <button class="clear-btn">×</button>
+        </div>
+        <div class="toolbar-actions">
+            <button class="btn btn-outline-secondary add-formula-field" title="Add Formula Field">
+                <i class="fas fa-calculator"></i> Add Formula
+            </button>
+            <button class="btn btn-outline-secondary" id="resetFilters" title="Reset Filters">
+                <i class="fas fa-filter-circle-xmark"></i> Reset Filters
+            </button>
+            <button class="btn btn-outline-secondary" title="Add Chart">
+                <i class="fas fa-chart-bar"></i>
+            </button>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="saveAndRunBtn">Save & Run</button>
+                <button class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" id="saveOnlyBtn">Save Only</a></li>
+                    <li><a class="dropdown-item" href="#" id="runOnlyBtn">Run Only</a></li>
+                </ul>
+            </div>
+            <button class="btn btn-outline-secondary" title="Close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="report-content">
+        <div class="sidebar">
+            <div class="grouping-section">
+                <div class="section-header">
+                    <span><i class="fas fa-layer-group"></i> Group By</span>
+                    <button class="btn btn-sm btn-outline-primary" id="addGroupBtn">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div id="groupingList">
+                        {% for group in report.groupings.all %}
+                        <div class="group-item" data-id="{{ group.id }}">
+                            <div>
+                                <i class="fas fa-grip-vertical drag-handle"></i>
+                                <span>{{ group.field_path }}</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn btn-sm btn-outline-danger remove-group">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="aggregation-section">
+                <div class="section-header">
+                    <span><i class="fas fa-calculator"></i> Aggregations</span>
+                    <button class="btn btn-sm btn-outline-primary" id="addAggregationBtn">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div id="aggregationList">
+                        {% for column in report.columns.all %}
+                        {% if column.aggregation %}
+                        <div class="aggregation-item" data-id="{{ column.id }}">
+                            <div>
+                                <span>{{ column.display_name }}</span>
+                                <small class="text-muted">({{ column.aggregation }})</small>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn btn-sm btn-outline-secondary edit-aggregation">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger remove-aggregation">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Active Filters section -->
+            <div class="active-filters">
+                <div class="active-filters-header">
+                    <h6 class="mb-0 p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                        <span>Active Filters</span>
+                        {% if report.filters.exists %}
+                        <button class="btn btn-sm btn-link text-danger p-0" id="resetFilters" title="Reset All Filters">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        {% endif %}
+                    </h6>
+                </div>
+                <div class="active-filters-list p-2">
+                    {% if report.filters.exists %}
+                        {% for filter in report.filters.all %}
+                        <div class="active-filter-item p-2 mb-2 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="filter-field">{{ filter.field_path|title }}</div>
+                                    <div class="filter-details text-muted small">
+                                        <span>{{ operators|get_item:filter.operator }}: </span>
+                                        <span class="filter-value">{{ filter.value }}</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-link text-danger p-0 delete-filter" data-filter-id="{{ filter.id }}" title="Remove Filter">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-muted small p-2">No active filters</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="field-list">
+                {% for group in field_groups %}
+                <div class="field-group">
+                    <div class="field-group-header">
+                        <span>{{ group.name }}</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="field-items">
+                        {% for field in group.fields %}
+                        <div class="field-item">
+                            <div class="field-name">
+                                <i class="fas {{ field.icon }}"></i>
+                                <div>
+                                    <span>{{ field.verbose_name }}</span>
+                                    {% if field.type == 'Relation' or field.type == 'Indirect Relation' %}
+                                    <div class="field-relation">
+                                        <i class="fas fa-arrow-right"></i> {{ field.related_model }}
+                                        <button class="btn btn-link btn-sm p-0 expand-relation" data-path="{{ field.path }}">
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                    </div>
+                                    <div class="field-subitem" id="relation-{{ field.path }}">
+                                        {% for subfield in field.fields %}
+                                        <div class="field-item">
+                                            <div class="field-name">
+                                                <i class="fas {{ subfield.icon }}"></i>
+                                                <span>{{ subfield.verbose_name }}</span>
+                                            </div>
+                                            <div class="field-actions">
+                                                <button class="btn btn-sm btn-outline-primary add-field" 
+                                                        data-field="{{ subfield.path }}"
+                                                        data-name="{{ subfield.verbose_name }}"
+                                                        data-type="{{ subfield.type }}"
+                                                        data-operators="{{ subfield.operators|join:',' }}"
+                                                        {% if subfield.path in report.columns.all|map_field_paths %}disabled{% endif %}>
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary add-filter"
+                                                        data-field="{{ subfield.path }}"
+                                                        data-name="{{ subfield.verbose_name }}"
+                                                        data-type="{{ subfield.type }}"
+                                                        data-operators="{{ subfield.operators|join:',' }}">
+                                                    <i class="fas fa-filter"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="field-actions">
+                                <button class="btn btn-sm btn-outline-primary add-field" 
+                                        data-field="{{ field.path }}"
+                                        data-name="{{ field.verbose_name }}"
+                                        data-type="{{ field.type }}"
+                                        data-operators="{{ field.operators|join:',' }}"
+                                        {% if field.path in report.columns.all|map_field_paths %}disabled{% endif %}>
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                {% if not field.type == 'Relation' and not field.type == 'Indirect Relation' %}
+                                <button class="btn btn-sm btn-outline-secondary add-filter"
+                                        data-field="{{ field.path }}"
+                                        data-name="{{ field.verbose_name }}"
+                                        data-type="{{ field.type }}"
+                                        data-operators="{{ field.operators|join:',' }}">
+                                    <i class="fas fa-filter"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="auto-update-toggle">
+                <span>Update Preview Automatically</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <div class="preview-table-wrapper">
+                <div class="table-responsive">
+                    <table class="table table-bordered report-table">
+                        <thead>
+                            <tr>
+                                {% for column in report.columns.all %}
+                                    {% if column.is_visible %}
+                                        <th data-field="{{ column.field_path }}" class="sortable-header">
+                                            {{ column.display_name }}
+                                            <i class="fas fa-sort sort-icon"></i>
+                                        </th>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in preview_data %}
+                                {% if row.is_group_row %}
+                                    <tr class="group-row" data-group-level="{{ row.group_level }}">
+                                        {% for column in report.columns.all %}
+                                            {% if column.is_visible %}
+                                                <td style="padding-left: {{ row.group_level|add:1 }}rem">
+                                                    {% if forloop.first %}
+                                                        <i class="fas fa-chevron-down group-toggle"></i>
+                                                    {% endif %}
+                                                    {{ row|get_dict_value:column.field_path|default:'(None)' }}
+                                                    {% if forloop.first %}
+                                                        <span class="badge bg-secondary">{{ row.record_count|default:0 }} records</span>
+                                                    {% endif %}
+                                                </td>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tr>
+                                {% elif row.is_subtotal %}
+                                    <tr class="subtotal-row">
+                                        {% for column in report.columns.all %}
+                                            {% if column.is_visible %}
+                                                <td>
+                                                    {% if column.aggregation %}
+                                                        Subtotal: {{ row|get_dict_value:column.field_path|default_if_none:"N/A" }}
+                                                    {% else %}
+                                                        &nbsp;
+                                                    {% endif %}
+                                                </td>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tr>
+                                {% else %}
+                                    <tr class="detail-row" data-group-level="{{ row.group_level }}">
+                                        {% for column in report.columns.all %}
+                                            {% if column.is_visible %}
+                                                <td style="padding-left: {{ row.group_level|add:2 }}rem">
+                                                    {{ row|get_dict_value:column.field_path|default:'' }}
+                                                </td>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tr>
+                                {% endif %}
+                            {% empty %}
+                                <tr>
+                                    <td colspan="{{ report.columns.filter.is_visible.count }}" class="text-center">
+                                        No data available
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        {% if preview_data.grand_totals %}
+                            <tfoot>
+                                <tr class="table-info">
+                                    {% for column in report.columns.all %}
+                                        {% if column.is_visible %}
+                                            <td>
+                                                {% if column.field_path in preview_data.grand_totals %}
+                                                    Grand Total: {{ preview_data.grand_totals|get_dict_value:column.field_path|default_if_none:"N/A" }}
+                                                {% else %}
+                                                    &nbsp;
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
+                                    {% endfor %}
+                                </tr>
+                            </tfoot>
+                        {% endif %}
+                    </table>
+                </div>
+
+                <!-- Add page size selector -->
+                <div class="d-flex align-items-center mb-3">
+                    <label class="me-2">Show entries:</label>
+                    <select class="form-select form-select-sm" id="pageSizeSelect" style="width: auto;">
+                        <option value="10" {% if request.GET.page_size == '10' or not request.GET.page_size %}selected{% endif %}>10</option>
+                        <option value="25" {% if request.GET.page_size == '25' %}selected{% endif %}>25</option>
+                        <option value="50" {% if request.GET.page_size == '50' %}selected{% endif %}>50</option>
+                        <option value="100" {% if request.GET.page_size == '100' %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+
+                <!-- Existing pagination controls -->
+                {% if preview_data.paginator.num_pages > 1 %}
+                <div class="pagination-controls mt-3 d-flex justify-content-between align-items-center">
+                    <div class="pagination-info">
+                        Showing {{ preview_data.start_index }} to {{ preview_data.end_index }} of {{ preview_data.paginator.count }} entries
+                    </div>
+                    <nav aria-label="Table navigation">
+                        <ul class="pagination mb-0">
+                            {% if preview_data.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="#" data-page="{{ preview_data.previous_page_number }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% for num in preview_data.paginator.page_range %}
+                                {% if num == preview_data.number %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > preview_data.number|add:'-3' and num < preview_data.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="#" data-page="{{ num }}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if preview_data.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="#" data-page="{{ preview_data.next_page_number }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Modal -->
+<div class="modal filter-modal fade" id="filterModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Filter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="filterForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="field_path" id="filterFieldPath">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Field</label>
+                        <input type="text" class="form-control" id="filterFieldName" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Operator</label>
+                        <select class="form-control" name="operator" id="filterOperator">
+                            {% for key, name in operators.items %}
+                            <option value="{{ key }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <!-- Single value input -->
+                        <div class="filter-value-input active" id="singleValueInput">
+                            <label class="form-label">Value</label>
+                            <select class="form-control" name="value">
+                                <option value="">Select a value...</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Range input -->
+                        <div class="filter-value-input" id="rangeValueInput">
+                            <label class="form-label">Range</label>
+                            <div class="row">
+                                <div class="col">
+                                    <select class="form-control" name="range_start">
+                                        <option value="">Select start value...</option>
+                                    </select>
+                                </div>
+                                <div class="col">
+                                    <select class="form-control" name="range_end">
+                                        <option value="">Select end value...</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- List input -->
+                        <div class="filter-value-input" id="listValueInput">
+                            <label class="form-label">Values</label>
+                            <select class="form-control" name="list_values" multiple>
+                            </select>
+                            <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple values</small>
+                        </div>
+                        
+                        <!-- Boolean input -->
+                        <div class="filter-value-input" id="booleanValueInput">
+                            <label class="form-label">Value</label>
+                            <select class="form-control" name="boolean_value">
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveFilter">Add Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Group Modal -->
+<div class="modal fade" id="addGroupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="groupForm">
+                    <div class="mb-3">
+                        <label class="form-label">Field</label>
+                        <select class="form-select" name="field_path" required>
+                            <option value="">Select a field...</option>
+                            {% for group in field_groups %}
+                            <optgroup label="{{ group.name }}">
+                                {% for field in group.fields %}
+                                <option value="{{ field.path }}">{{ field.verbose_name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveGroupBtn">Add Group</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Aggregation Modal -->
+<div class="modal fade" id="addAggregationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Aggregation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="aggregationForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Field</label>
+                        <select class="form-select select2" name="field_path" required>
+                            <option value="">Select a field...</option>
+                            {% for group in field_groups %}
+                            <optgroup label="{{ group.name }}">
+                                {% for field in group.fields %}
+                                {% if field.type == "IntegerField" or field.type == "FloatField" or field.type == "DecimalField" %}
+                                <option value="{{ field.path }}">{{ field.verbose_name }}</option>
+                                {% endif %}
+                                {% if field.fields %}
+                                    {% for subfield in field.fields %}
+                                    {% if subfield.type == "IntegerField" or subfield.type == "FloatField" or subfield.type == "DecimalField" %}
+                                    <option value="{{ subfield.path }}">{{ field.verbose_name }} → {{ subfield.verbose_name }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Aggregation Type</label>
+                        <select class="form-select" name="aggregation" required>
+                            <option value="">Select aggregation...</option>
+                            <option value="COUNT">Count</option>
+                            <option value="SUM">Sum</option>
+                            <option value="AVG">Average</option>
+                            <option value="MIN">Minimum</option>
+                            <option value="MAX">Maximum</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveAggregationBtn">Add Aggregation</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Formula Field Modal -->
+<div class="modal fade" id="formulaFieldModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Formula Field</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formulaFieldForm">
+                    <div class="mb-3">
+                        <label class="form-label">Display Name</label>
+                        <input type="text" class="form-control" name="display_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Formula</label>
+                        <div class="input-group">
+                            <textarea class="form-control" name="formula" rows="3" required></textarea>
+                            <button type="button" class="btn btn-outline-secondary" id="insertFieldBtn">
+                                Insert Field
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Use field names in curly braces, e.g. {first_name} + ' ' + {last_name}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Available Fields</label>
+                        <div class="available-fields">
+                            {% for field in available_fields %}
+                            <span class="field-placeholder" data-field="{{ field.name }}">
+                                {{ field.display_name }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="is_visible" checked>
+                            <label class="form-check-label">Show in report</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveFormulaField">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update Column Configuration Modal -->
+<div class="modal fade" id="columnConfigModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Column</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="columnConfigForm">
+                    <input type="hidden" name="column_id">
+                    <div class="mb-3">
+                        <label class="form-label">Display Name</label>
+                        <input type="text" class="form-control" name="display_name" required>
+                    </div>
+                    <div class="mb-3 formula-section" style="display: none;">
+                        <label class="form-label">Formula</label>
+                        <div class="input-group">
+                            <textarea class="form-control" name="formula" rows="3"></textarea>
+                            <button type="button" class="btn btn-outline-secondary insert-field-btn">
+                                Insert Field
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Use field names in curly braces, e.g. {first_name} + ' ' + {last_name}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Aggregation</label>
+                        <select class="form-control" name="aggregation">
+                            <option value="">No Aggregation</option>
+                            <option value="COUNT">Count</option>
+                            <option value="SUM">Sum</option>
+                            <option value="AVG">Average</option>
+                            <option value="MIN">Minimum</option>
+                            <option value="MAX">Maximum</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="is_visible">
+                            <label class="form-check-label">Show in report</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveColumnConfig">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Initialize all modals
+    const formulaModal = new bootstrap.Modal(document.getElementById('formulaFieldModal'));
+    const columnConfigModal = new bootstrap.Modal(document.getElementById('columnConfigModal'));
+
+    // Add Formula Field button click handler
+    $(document).on('click', '.add-formula-field', function(e) {
+        e.preventDefault();
+        // Reset the form
+        $('#formulaFieldForm')[0].reset();
+        // Show the modal
+        formulaModal.show();
+    });
+
+    // Insert field into formula
+    $(document).on('click', '.field-placeholder', function() {
+        const fieldName = $(this).data('field');
+        const formula = $(this).closest('.modal-body').find('textarea[name="formula"]');
+        const cursorPos = formula.prop('selectionStart');
+        const textBefore = formula.val().substring(0, cursorPos);
+        const textAfter = formula.val().substring(cursorPos);
+        formula.val(textBefore + '{' + fieldName + '}' + textAfter);
+    });
+
+    // Save formula field
+    $(document).on('click', '#saveFormulaField', function() {
+        const form = $('#formulaFieldForm');
+        const formData = new FormData(form[0]);
+        formData.append('is_formula', 'true');
+        formData.append('csrfmiddlewaretoken', $('input[name=csrfmiddlewaretoken]').val());
+        
+                $.ajax({
+            url: '{% url "report:add_column" report.id %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    formulaModal.hide();
+                    // Refresh the preview table
+                    refreshPreviewWithParams(new URLSearchParams(window.location.search));
+                } else {
+                    alert(response.error || 'Error saving formula field');
+                }
+            },
+            error: function(xhr) {
+                alert('Error saving formula field: ' + (xhr.responseJSON?.error || 'Server error'));
+            }
+        });
+    });
+
+    // Clear search
+    $('.clear-btn').click(function() {
+        $('#field-search').val('').trigger('input');
+    });
+
+    // Field search
+    $('#field-search').on('input', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        $('.field-item').each(function() {
+            const text = $(this).find('.field-name').text().toLowerCase();
+            $(this).toggle(text.includes(searchTerm));
+        });
+    });
+
+    // Show first field group by default
+    $('.field-group:first .field-items').show();
+    
+    // Toggle field groups
+    $('.field-group-header').click(function() {
+        $(this).find('i').toggleClass('fa-chevron-down fa-chevron-right');
+        $(this).next('.field-items').slideToggle();
+    });
+    
+    // Toggle related fields
+    $('.expand-relation').click(function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const path = $(this).data('path');
+        $(`#relation-${path}`).slideToggle();
+        $(this).find('i').toggleClass('fa-chevron-down fa-chevron-right');
+    });
+    
+    // Initialize filter modal
+    const filterModal = new bootstrap.Modal('#filterModal');
+    
+    // Load field values for dropdowns
+    function loadFieldValues(fieldPath) {
+        $.get("{% url 'report:get_field_values' report.id %}", { field_path: fieldPath })
+            .done(function(response) {
+                if (response.success) {
+                    // Update all value dropdowns
+                    const values = response.values;
+                    const $singleSelect = $('#singleValueInput select');
+                    const $rangeStart = $('#rangeValueInput select[name=range_start]');
+                    const $rangeEnd = $('#rangeValueInput select[name=range_end]');
+                    const $listSelect = $('#listValueInput select');
+                    
+                    // Clear existing options except the first one
+                    $singleSelect.find('option:not(:first)').remove();
+                    $rangeStart.find('option:not(:first)').remove();
+                    $rangeEnd.find('option:not(:first)').remove();
+                    $listSelect.empty();
+                    
+                    // Add new options
+                    values.forEach(value => {
+                        $singleSelect.append(new Option(value, value));
+                        $rangeStart.append(new Option(value, value));
+                        $rangeEnd.append(new Option(value, value));
+                        $listSelect.append(new Option(value, value));
+                    });
+                }
+            });
+    }
+    
+    // Open filter modal
+    $('.add-filter').click(function() {
+        const field = $(this).data('field');
+        const name = $(this).data('name');
+        const type = $(this).data('type');
+        const operators = $(this).data('operators').split(',');
+        
+        $('#filterFieldPath').val(field);
+        $('#filterFieldName').val(name);
+        
+        // Update available operators
+        const $operatorSelect = $('#filterOperator');
+        $operatorSelect.empty();
+        operators.forEach(op => {
+            $operatorSelect.append(`<option value="${op}">${window.operators[op]}</option>`);
+        });
+        
+        // Load field values
+        loadFieldValues(field);
+        
+        filterModal.show();
+    });
+    
+    // Handle operator change
+    $('#filterOperator').change(function() {
+        const operator = $(this).val();
+        $('.filter-value-input').removeClass('active');
+        
+        switch(operator) {
+            case 'range':
+                $('#rangeValueInput').addClass('active');
+                break;
+            case 'in':
+                $('#listValueInput').addClass('active');
+                break;
+            case 'isnull':
+                $('#booleanValueInput').addClass('active');
+                break;
+            default:
+                $('#singleValueInput').addClass('active');
+        }
+    });
+    
+    // Save filter
+    $('#saveFilter').click(function() {
+        const operator = $('#filterOperator').val();
+        let value;
+        
+        switch(operator) {
+            case 'range':
+                value = [$('#rangeValueInput select[name=range_start]').val(),
+                        $('#rangeValueInput select[name=range_end]').val()].join(',');
+                break;
+            case 'in':
+                value = $('#listValueInput select').val().join(',');
+                break;
+            case 'isnull':
+                value = $('#booleanValueInput select').val();
+                break;
+            default:
+                value = $('#singleValueInput select').val();
+        }
+        
+        $.ajax({
+            url: "{% url 'report:save_filter' report.id %}",
+                    method: 'POST',
+                    data: {
+                field_path: $('#filterFieldPath').val(),
+                operator: operator,
+                value: value,
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                    location.reload();
+                        }
+                    }
+                });
+        });
+    
+    // Make operators available globally
+    window.operators = {{ operators|safe }};
+
+    // Add field to report
+    $('.add-field').click(function() {
+        if ($(this).prop('disabled')) {
+            return;
+    }
+
+        const fieldPath = $(this).data('field');
+        const fieldName = $(this).data('name');
+        const fieldType = $(this).data('type');
+        
+        $.ajax({
+            url: "{% url 'report:save_report_column' report.id %}",
+            method: 'POST',
+            data: {
+                field_path: fieldPath,
+                display_name: fieldName,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Disable all add field buttons with the same field path
+                    $(`.add-field[data-field="${fieldPath}"]`).prop('disabled', true);
+                    location.reload();
+                }
+            }
+        });
+    });
+
+    // Handle column sorting
+    $(document).on('click', '.sort-column', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const $button = $(this);
+        // Hide the tooltip immediately
+        const tooltip = bootstrap.Tooltip.getInstance($button[0]);
+        if (tooltip) {
+            tooltip.hide();
+        }
+
+        const field = $button.data('field');
+        let direction = $button.data('direction');
+        
+        // Toggle sort direction
+        direction = direction === 'asc' ? 'desc' : 'asc';
+        $button.data('direction', direction);
+        
+        // Update sort icon
+        const $icon = $button.find('i');
+        $icon.removeClass('fa-sort fa-sort-up fa-sort-down')
+             .addClass(direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+        
+        // Reset other columns' sort icons and direction
+        $('.sort-column').not($button).each(function() {
+            $(this).data('direction', 'asc')
+                  .find('i')
+                  .removeClass('fa-sort-up fa-sort-down')
+                  .addClass('fa-sort');
+        });
+        
+        // Show sorting message
+        const columnName = $button.closest('.column-header').text().trim();
+        const directionText = direction === 'asc' ? 'ascending' : 'descending';
+        const $sortMessage = $('#sortMessage');
+        $sortMessage.text(`Sorting ${columnName} in ${directionText} order...`)
+                   .css('display', 'block');
+        
+        // Hide message after 2 seconds
+        setTimeout(() => {
+            $sortMessage.css('display', 'none');
+        }, 2000);
+        
+        // Show loading state
+        $('.preview-table-wrapper').addClass('loading').css('opacity', '0.5');
+        
+        // Add loading spinner
+        const spinner = $('<div class="text-center my-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
+        $('.preview-table-wrapper').append(spinner);
+        
+        // Get current page size and any active filters
+        const pageSize = $('#page-size-select').val() || 10;
+        const currentParams = new URLSearchParams(window.location.search);
+        
+        // Prepare request data
+        const requestData = {
+            page: 1, // Reset to first page when sorting
+            page_size: pageSize,
+            sort_field: field,
+            sort_direction: direction
+        };
+        
+        // Add any existing filter parameters
+        currentParams.forEach((value, key) => {
+            if (key.startsWith('filter_')) {
+                requestData[key] = value;
+            }
+        });
+        
+        // Make the AJAX request
+        $.ajax({
+            url: window.location.pathname,
+            method: 'GET',
+            data: requestData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                $('.preview-table-wrapper').html(response);
+                initializeTableComponents();
+                
+                // Update URL to reflect sort state without page reload
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.set('sort_field', field);
+                newUrl.searchParams.set('sort_direction', direction);
+                window.history.pushState({}, '', newUrl);
+            },
+            error: function() {
+                alert('Error sorting data. Please try again.');
+            },
+            complete: function() {
+                $('.preview-table-wrapper').removeClass('loading').css('opacity', '1');
+                spinner.remove();
+            }
+        });
+    });
+
+    // Initialize tooltips
+    $('[title]').tooltip();
+
+    // Reset filters
+    $('#resetFilters').click(function() {
+        $.ajax({
+            url: "{% url 'report:reset_filters' report.id %}",
+            method: 'POST',
+            data: {
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                }
+            }
+        });
+    });
+
+    // Delete individual filter
+    $('.delete-filter').click(function() {
+        const filterId = $(this).data('filter-id');
+        $.ajax({
+            url: "{% url 'report:delete_filter' report.id %}",
+            method: 'POST',
+            data: {
+                filter_id: filterId,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                }
+            }
+        });
+    });
+
+    // Handle pagination clicks
+    $(document).on('click', '.pagination .page-link', function(e) {
+        e.preventDefault();
+        const page = $(this).data('page');
+        const pageSize = $('#page-size-select').val();
+        
+        // Show loading state
+        $('.preview-table-wrapper').addClass('loading').css('opacity', '0.5');
+        
+        // Add loading spinner
+        const spinner = $('<div class="text-center my-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
+        $('.preview-table-wrapper').append(spinner);
+
+        $.ajax({
+            url: window.location.pathname,
+            method: 'GET',
+            data: {
+                page: page,
+                page_size: pageSize
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                $('.preview-table-wrapper').html(response);
+                initializeTableComponents();
+            },
+            error: function() {
+                alert('Error loading data. Please try again.');
+            },
+            complete: function() {
+                $('.preview-table-wrapper').removeClass('loading').css('opacity', '1');
+                spinner.remove();
+            }
+        });
+    });
+
+    // Handle page size change
+    $(document).on('change', '#page-size-select', function() {
+        const pageSize = $(this).val();
+        
+        // Show loading state
+        $('.preview-table-wrapper').addClass('loading').css('opacity', '0.5');
+        
+        // Add loading spinner
+        const spinner = $('<div class="text-center my-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
+        $('.preview-table-wrapper').append(spinner);
+        
+        $.ajax({
+            url: window.location.pathname,
+            method: 'GET',
+            data: { 
+                page: 1,  // Reset to first page when changing page size
+                page_size: pageSize
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                $('.preview-table-wrapper').html(response);
+                initializeTableComponents();
+            },
+            error: function() {
+                alert('Error loading data. Please try again.');
+            },
+            complete: function() {
+                $('.preview-table-wrapper').removeClass('loading').css('opacity', '1');
+                spinner.remove();
+            }
+        });
+    });
+
+    function initializeTableComponents() {
+        // Reinitialize sortable columns
+        $('.preview-table thead tr').sortable({
+            handle: '.sort-handle',
+            axis: 'x',
+            update: function(event, ui) {
+                const order = [];
+                $('.column-header').each(function() {
+                    order.push($(this).data('id'));
+                });
+                
+                $.ajax({
+                    url: "{% url 'report:save_report_column' report.id %}",
+                    method: 'POST',
+                    data: {
+                        order: JSON.stringify(order),
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    }
+                });
+            }
+        });
+
+        // Reinitialize tooltips
+        $('[title]').tooltip();
+    }
+
+    // Delete column and its associated filters
+    $(document).on('click', '.delete-column', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const columnId = $(this).data('column-id');
+        const fieldPath = $(this).data('field-path');
+        
+        if (confirm('Are you sure you want to delete this column? Any filters applied to this column will also be deleted.')) {
+            $.ajax({
+                url: "{% url 'report:save_report_column' report.id %}",
+                method: 'POST',
+                data: {
+                    delete: columnId,
+                    field_path: fieldPath,
+                    csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Enable the add field button for this field path
+                        $(`.add-field[data-field="${fieldPath}"]`).prop('disabled', false);
+                        location.reload();
+                    }
+                }
+            });
+        }
+    });
+
+    // Handle Save & Run button click
+    $('#saveAndRunBtn').click(function() {
+        saveAndRunReport();
+    });
+
+    // Handle Save Only button click
+    $('#saveOnlyBtn').click(function(e) {
+        e.preventDefault();
+        saveReport();
+    });
+
+    // Handle Run Only button click
+    $('#runOnlyBtn').click(function(e) {
+        e.preventDefault();
+        runReport();
+    });
+
+    function saveAndRunReport() {
+        // Show loading state
+        const $saveBtn = $('#saveAndRunBtn');
+        const originalText = $saveBtn.html();
+        $saveBtn.html('<i class="fas fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
+        
+        // First save the report
+        $.ajax({
+            url: "{% url 'report:save_report_column' report.id %}",
+            method: 'POST',
+            data: {
+                save_state: true,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $saveBtn.html('<i class="fas fa-spinner fa-spin"></i> Running...');
+                    // After saving, redirect to execute the report
+                    window.location.href = "{% url 'report:execute_report' report.id %}";
+                } else {
+                    alert('Error saving report configuration: ' + (response.error || 'Unknown error'));
+                    $saveBtn.html(originalText).prop('disabled', false);
+                }
+            },
+            error: function(xhr) {
+                alert('Error saving report configuration: ' + (xhr.responseJSON?.error || 'Server error'));
+                $saveBtn.html(originalText).prop('disabled', false);
+            }
+        });
+    }
+
+    function saveReport() {
+        // Show loading state
+        const $saveBtn = $('#saveOnlyBtn');
+        const originalText = $saveBtn.html();
+        $saveBtn.html('<i class="fas fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
+        
+        $.ajax({
+            url: "{% url 'report:save_report_column' report.id %}",
+            method: 'POST',
+            data: {
+                save_state: true,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    const $alert = $('<div class="alert alert-success alert-dismissible fade show" role="alert">')
+                        .text('Report configuration saved successfully!')
+                        .append('<button type="button" class="btn-close" data-bs-dismiss="alert"></button>')
+                        .appendTo('.content-area');
+                    
+                    // Auto dismiss after 3 seconds
+                    setTimeout(() => {
+                        $alert.alert('close');
+                    }, 3000);
+                } else {
+                    alert('Error saving report configuration: ' + (response.error || 'Unknown error'));
+                }
+            },
+            error: function(xhr) {
+                alert('Error saving report configuration: ' + (xhr.responseJSON?.error || 'Server error'));
+            },
+            complete: function() {
+                $saveBtn.html(originalText).prop('disabled', false);
+            }
+        });
+    }
+
+    function runReport() {
+        // Show loading state
+        const $runBtn = $('#runOnlyBtn');
+        const originalText = $runBtn.html();
+        $runBtn.html('<i class="fas fa-spinner fa-spin"></i> Running...').prop('disabled', true);
+        
+        // Redirect to execute the report
+        window.location.href = "{% url 'report:execute_report' report.id %}";
+    }
+
+    // Initialize Bootstrap modals
+    const addGroupModal = new bootstrap.Modal(document.getElementById('addGroupModal'));
+    const addAggregationModal = new bootstrap.Modal(document.getElementById('addAggregationModal'));
+
+    // Initialize select2 for all select2 elements
+    function initializeSelect2() {
+        $('.select2').select2({
+            dropdownParent: $('#addAggregationModal'),
+            width: '100%'
+        }).on('select2:close', function() {
+            $(this).focus();
+        });
+    }
+
+    // Add Aggregation button click
+    $('#addAggregationBtn').click(function() {
+        // Show the modal using the existing instance
+        addAggregationModal.show();
+    });
+
+    // Initialize Select2 after modal is shown
+    $('#addAggregationModal').on('shown.bs.modal', function() {
+        // Destroy existing Select2 instance if it exists
+        if ($('.select2').data('select2')) {
+            $('.select2').select2('destroy');
+        }
+        initializeSelect2();
+    });
+
+    // Reset Select2 when modal is hidden
+    $('#addAggregationModal').on('hidden.bs.modal', function() {
+        $('.select2').val('').trigger('change');
+    });
+
+    // Add group button click
+    $('#addGroupBtn').click(function() {
+        addGroupModal.show();
+    });
+
+    // Save group button click
+    $('#saveGroupBtn').click(function() {
+        const form = $('#groupForm');
+        const fieldPath = form.find('[name="field_path"]').val();
+        
+        if (!fieldPath) {
+            alert('Please select a field');
+            return;
+        }
+
+        $.ajax({
+            url: "{% url 'report:save_grouping' report.id %}",
+            method: 'POST',
+            data: {
+                field_path: fieldPath,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Add new group to the list
+                    const groupHtml = `
+                        <div class="group-item" data-id="${response.group.id}">
+                            <div>
+                                <i class="fas fa-grip-vertical drag-handle"></i>
+                                <span>${response.group.field_path}</span>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn btn-sm btn-outline-danger remove-group">
+                                    <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+                    $('#groupingList').append(groupHtml);
+                    addGroupModal.hide();
+                    form[0].reset();
+                } else {
+                    alert('Error adding group: ' + (response.error || 'Unknown error'));
+                }
+            },
+            error: function(xhr) {
+                alert('Error adding group: ' + (xhr.responseJSON?.error || 'Server error'));
+            }
+        });
+    });
+
+    // Save aggregation button click
+    $('#saveAggregationBtn').click(function() {
+        const form = $('#aggregationForm');
+        const fieldPath = form.find('[name="field_path"]').val();
+        const aggregation = form.find('[name="aggregation"]').val();
+        
+        if (!fieldPath || !aggregation) {
+            alert('Please fill in all fields');
+            return;
+    }
+
+        $.ajax({
+            url: "{% url 'report:save_aggregation' report.id %}",
+            method: 'POST',
+            data: {
+                field_path: fieldPath,
+                aggregation: aggregation,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Add new aggregation to the list
+                    const aggregationHtml = `
+                        <div class="aggregation-item" data-id="${response.column.id}">
+                            <div>
+                                <span>${response.column.display_name}</span>
+                                <small class="text-muted">(${response.column.aggregation})</small>
+                            </div>
+                            <div class="item-actions">
+                                <button class="btn btn-sm btn-outline-danger remove-aggregation">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    $('#aggregationList').append(aggregationHtml);
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addAggregationModal'));
+                    modal.hide();
+                    form[0].reset();
+                    $('.select2').val('').trigger('change');
+                    location.reload();
+                } else {
+                    alert('Error adding aggregation: ' + (response.error || 'Unknown error'));
+                }
+            },
+            error: function(xhr) {
+                alert('Error adding aggregation: ' + (xhr.responseJSON?.error || 'Server error'));
+            }
+        });
+    });
+
+    // Remove aggregation button click
+    $(document).on('click', '.remove-aggregation', function() {
+        const item = $(this).closest('.aggregation-item');
+        const columnId = item.data('id');
+
+        if (!confirm('Are you sure you want to remove this aggregation?')) {
+            return;
+        }
+
+        $.ajax({
+            url: "{% url 'report:delete_aggregation' report.id %}",
+            method: 'POST',
+            data: {
+                column_id: columnId,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    item.remove();
+                    location.reload();
+                } else {
+                    alert('Error removing aggregation: ' + (response.error || 'Unknown error'));
+                }
+            },
+            error: function(xhr) {
+                alert('Error removing aggregation: ' + (xhr.responseJSON?.error || 'Server error'));
+    }
+        });
+    });
+
+    // Remove group button click
+    $(document).on('click', '.remove-group', function() {
+        const item = $(this).closest('.group-item');
+        const groupId = item.data('id');
+
+        $.ajax({
+            url: "{% url 'report:delete_grouping' report.id %}",
+            method: 'POST',
+            data: {
+                group_id: groupId,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    item.remove();
+                } else {
+                    alert('Error removing group: ' + (response.error || 'Unknown error'));
+                }
+            },
+            error: function(xhr) {
+                alert('Error removing group: ' + (xhr.responseJSON?.error || 'Server error'));
+            }
+        });
+    });
+
+    // Initialize sortable for groups
+    if (document.getElementById('groupingList')) {
+        new Sortable(document.getElementById('groupingList'), {
+            handle: '.drag-handle',
+                animation: 150,
+            onEnd: function() {
+                updateGroupOrder();
+            }
+        });
+    }
+
+    function updateGroupOrder() {
+        const order = [];
+        $('#groupingList .group-item').each(function() {
+            order.push($(this).data('id'));
+        });
+
+        $.ajax({
+            url: "{% url 'report:update_grouping_order' report.id %}",
+            method: 'POST',
+            data: {
+                order: JSON.stringify(order),
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            error: function(xhr) {
+                alert('Error updating group order: ' + (xhr.responseJSON?.error || 'Server error'));
+            }
+        });
+    }
+
+    // Function to format numbers
+    function formatNumber(value) {
+        if (typeof value === 'number') {
+            return value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        return value;
+    }
+
+    // Toggle group expansion
+    $('.group-toggle').click(function(e) {
+        e.stopPropagation();
+        const groupRow = $(this).closest('.group-row');
+        const level = parseInt(groupRow.data('group-level'));
+        const isExpanded = $(this).hasClass('fa-chevron-down');
+        
+        // Toggle chevron
+        $(this).toggleClass('fa-chevron-down fa-chevron-up');
+        
+        // Find all following rows until next group of same or higher level
+        let currentRow = groupRow.next();
+        while (currentRow.length) {
+            const rowGroupLevel = parseInt(currentRow.data('group-level'));
+            
+            // Stop if we hit a group row of same or higher level
+            if (currentRow.hasClass('group-row') && rowGroupLevel <= level) {
+                break;
+            }
+            
+            // Toggle visibility based on group state
+            if (isExpanded) {
+                currentRow.hide();
+            } else {
+                // Only show direct children when expanding
+                if (!currentRow.hasClass('group-row') || rowGroupLevel === level + 1) {
+                    currentRow.show();
+                }
+            }
+            
+            currentRow = currentRow.next();
+        }
+    });
+
+    // Excel-like column controls
+    $('.sort-action').click(function(e) {
+        e.preventDefault();
+        const field = $(this).data('field');
+        const direction = $(this).data('sort');
+        
+        // Update UI to show sorting state
+        $(this).closest('th').find('.column-title').append(
+            `<i class="fas fa-sort-${direction === 'asc' ? 'up' : 'down'} ms-1"></i>`
+        );
+        
+        // Reload the page with sort parameters
+        const url = new URL(window.location.href);
+        url.searchParams.set('sort_field', field);
+        url.searchParams.set('sort_direction', direction);
+        window.location.href = url.toString();
+    });
+
+    $('.group-action').click(function(e) {
+        e.preventDefault();
+        const field = $(this).data('field');
+        
+        $.ajax({
+            url: "{% url 'report:save_grouping' report.id %}",
+            method: 'POST',
+            data: {
+                field_path: field,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                }
+            }
+        });
+    });
+
+    $('.aggregate-action').click(function(e) {
+        e.preventDefault();
+        const field = $(this).data('field');
+        const aggregationType = $(this).data('type');
+        
+                    $.ajax({
+            url: "{% url 'report:save_aggregation' report.id %}",
+                        method: 'POST',
+                        data: {
+                field_path: field,
+                aggregation: aggregationType,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                }
+            }
+        });
+    });
+
+    // Show active states for grouped/aggregated columns
+    {% for group in report.groupings.all %}
+    $('th').find(`[data-field="{{ group.field_path }}"]`).closest('.column-header').addClass('is-grouped');
+    {% endfor %}
+
+    {% for column in report.columns.all %}
+    {% if column.aggregation %}
+    $('th').find(`[data-field="{{ column.field_path }}"]`).closest('.column-header').addClass('has-aggregation');
+    {% endif %}
+    {% endfor %}
+
+    // Handle sorting
+    $('.sortable-header').click(function() {
+        const field = $(this).data('field');
+        const currentSort = $(this).find('.sort-icon').attr('class');
+        let direction = 'asc';
+        
+        if (currentSort.includes('fa-sort-up')) {
+            direction = 'desc';
+            $(this).find('.sort-icon').removeClass('fa-sort-up').addClass('fa-sort-down');
+        } else if (currentSort.includes('fa-sort-down')) {
+            $(this).find('.sort-icon').removeClass('fa-sort-down').addClass('fa-sort');
+        } else {
+            direction = 'asc';
+            $(this).find('.sort-icon').removeClass('fa-sort').addClass('fa-sort-up');
+        }
+        
+        // Update URL parameters and reload
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('sort_field', field);
+        urlParams.set('sort_direction', direction);
+        window.location.search = urlParams.toString();
+    });
+
+    // Handle group toggling
+    $('.group-toggle').click(function(e) {
+        e.stopPropagation();
+        const groupRow = $(this).closest('tr');
+        const groupLevel = parseInt(groupRow.data('group-level'));
+        const isExpanded = $(this).hasClass('fa-chevron-down');
+        
+        // Toggle chevron
+        $(this).toggleClass('fa-chevron-down fa-chevron-up');
+        
+        // Find all following rows until next group of same or higher level
+        let currentRow = groupRow.next();
+        while (currentRow.length) {
+            const rowGroupLevel = parseInt(currentRow.data('group-level'));
+            
+            // Stop if we hit a group row of same or higher level
+            if (currentRow.hasClass('group-row') && rowGroupLevel <= groupLevel) {
+                break;
+            }
+            
+            // Toggle visibility based on group state
+            if (isExpanded) {
+                currentRow.hide();
+            } else {
+                // Only show direct children when expanding
+                if (!currentRow.hasClass('group-row') || rowGroupLevel === groupLevel + 1) {
+                    currentRow.show();
+                }
+            }
+            
+            currentRow = currentRow.next();
+        }
+    });
+
+    // Function to update URL parameters
+    function updateUrlParameter(key, value, url) {
+        const urlParams = new URLSearchParams(url || window.location.search);
+        urlParams.set(key, value);
+        return urlParams.toString();
+    }
+
+    // Handle page size changes
+    $('#pageSizeSelect').change(function() {
+        const pageSize = $(this).val();
+        const newUrl = updateUrlParameter('page_size', pageSize);
+        // Reset to page 1 when changing page size
+        window.location.search = updateUrlParameter('page', '1', newUrl);
+    });
+
+    // Handle pagination clicks
+    $('.page-link').click(function(e) {
+        e.preventDefault();
+        const page = $(this).data('page');
+        if (page) {
+            const currentParams = new URLSearchParams(window.location.search);
+            const pageSize = currentParams.get('page_size') || '10';
+            const sortField = currentParams.get('sort_field') || '';
+            const sortDirection = currentParams.get('sort_direction') || '';
+            
+            let newUrl = updateUrlParameter('page', page);
+            if (pageSize) newUrl = updateUrlParameter('page_size', pageSize, newUrl);
+            if (sortField) newUrl = updateUrlParameter('sort_field', sortField, newUrl);
+            if (sortDirection) newUrl = updateUrlParameter('sort_direction', sortDirection, newUrl);
+            
+            window.location.search = newUrl;
+        }
+    });
+
+    // Update pagination links to include current parameters
+    function updatePaginationLinks() {
+        const currentParams = new URLSearchParams(window.location.search);
+        const pageSize = currentParams.get('page_size') || '10';
+        const sortField = currentParams.get('sort_field') || '';
+        const sortDirection = currentParams.get('sort_direction') || '';
+
+        $('.page-link').each(function() {
+            const page = $(this).data('page');
+            if (page) {
+                let url = updateUrlParameter('page', page);
+                if (pageSize) url = updateUrlParameter('page_size', pageSize, url);
+                if (sortField) url = updateUrlParameter('sort_field', sortField, url);
+                if (sortDirection) url = updateUrlParameter('sort_direction', sortDirection, url);
+                $(this).attr('href', '?' + url);
+            }
+        });
+    }
+
+    // Initialize pagination links
+    updatePaginationLinks();
+
+    // Add grouping field
+    $('#addGroupingForm').submit(function(e) {
+        e.preventDefault();
+        const form = $(this);
+        const url = form.attr('action');
+        
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: form.serialize(),
+            success: function(response) {
+                if (response.success) {
+                    // Add the new group to the list
+                    const groupHtml = `
+                        <li class="list-group-item d-flex justify-content-between align-items-center" data-group-id="${response.group.id}">
+                            <span class="group-field">${response.group.field_path}</span>
+                            <button class="btn btn-sm btn-outline-danger delete-group">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </li>`;
+                    $('#groupingsList').append(groupHtml);
+                    
+                    // Clear the form
+                    form[0].reset();
+                    
+                    // Close the modal
+                    $('#addGroupModal').modal('hide');
+                    
+                    // Refresh the preview table with AJAX
+                    $.ajax({
+                        url: window.location.href,
+                        type: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        success: function(response) {
+                            $('#previewTableContainer').html(response);
+                            initializePreviewTableHandlers();
+                        }
+                    });
+                } else {
+                    alert('Error adding grouping: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                alert('Error adding grouping: ' + (xhr.responseJSON?.error || 'Server error'));
+            }
+        });
+    });
+
+    // Delete grouping
+    $(document).on('click', '.delete-group', function(e) {
+        e.preventDefault();
+        const groupItem = $(this).closest('li');
+        const groupId = groupItem.data('group-id');
+        
+        $.ajax({
+            url: "{% url 'report:delete_grouping' report.id %}",
+            type: 'POST',
+            data: {
+                group_id: groupId,
+                            csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    groupItem.remove();
+                    // Refresh the preview table with AJAX
+                    $.ajax({
+                        url: window.location.href,
+                        type: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        success: function(response) {
+                            $('#previewTableContainer').html(response);
+                            initializePreviewTableHandlers();
+                        }
+                    });
+                }
+            }
+        });
+    });
+
+    // Function to initialize preview table event handlers
+    function initializePreviewTableHandlers() {
+        // Re-initialize sorting
+        $('.sort-column').off('click').on('click', function() {
+            const field = $(this).data('field');
+            const direction = $(this).data('direction') === 'asc' ? 'desc' : 'asc';
+            updatePreviewWithSort(field, direction);
+        });
+        
+        // Re-initialize pagination
+        $('.page-link').off('click').on('click', function(e) {
+            e.preventDefault();
+            const page = $(this).data('page');
+            if (page) {
+                updatePreviewWithPage(page);
+            }
+        });
+        
+        // Re-initialize page size selector
+        $('#page-size-select').off('change').on('change', function() {
+            const pageSize = $(this).val();
+            updatePreviewWithPageSize(pageSize);
+        });
+
+        // Update pagination links
+        updatePaginationLinks();
+    }
+
+    // Update preview with sorting
+    function updatePreviewWithSort(field, direction) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('sort_field', field);
+        params.set('sort_direction', direction);
+        refreshPreviewWithParams(params);
+    }
+
+    // Update preview with page
+    function updatePreviewWithPage(page) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', page);
+        refreshPreviewWithParams(params);
+    }
+
+    // Update preview with page size
+    function updatePreviewWithPageSize(pageSize) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('page_size', pageSize);
+        params.set('page', '1');  // Reset to first page when changing page size
+        refreshPreviewWithParams(params);
+    }
+
+    // Refresh preview with parameters
+    function refreshPreviewWithParams(params) {
+        $.ajax({
+            url: window.location.pathname + '?' + params.toString(),
+            type: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                $('#previewTableContainer').html(response);
+                // Update URL without page reload
+                window.history.pushState({}, '', '?' + params.toString());
+                // Reinitialize handlers
+                initializePreviewTableHandlers();
+            },
+            error: function(xhr) {
+                console.error('Error updating preview:', xhr);
+                        }
+                    });
+                }
+
+    // Add Formula Field button
+    $('.add-formula-field').click(function() {
+        $('#formulaFieldModal').modal('show');
+    });
+
+    // Insert field into formula
+    $('.field-placeholder').click(function() {
+        var fieldName = $(this).data('field');
+        var formula = $('textarea[name="formula"]');
+        var cursorPos = formula.prop('selectionStart');
+        var textBefore = formula.val().substring(0, cursorPos);
+        var textAfter = formula.val().substring(cursorPos);
+        formula.val(textBefore + '{' + fieldName + '}' + textAfter);
+            });
+
+    // Save formula field
+    $('#saveFormulaField').click(function() {
+        var formData = new FormData($('#formulaFieldForm')[0]);
+        formData.append('is_formula', true);
+        
+        $.ajax({
+            url: '{% url "report:add_column" report.id %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    $('#formulaFieldModal').modal('hide');
+                    refreshPreview();
+                } else {
+                    alert(response.error || 'Error saving formula field');
+                }
+            },
+            error: function() {
+                alert('Error saving formula field');
+        }
+        });
+    });
+
+    // Show/hide formula section in column config
+    function toggleFormulaSection(isFormula) {
+        $('.formula-section')[isFormula ? 'show' : 'hide']();
+    }
+
+    // Update column configuration modal
+    $('.configure-column').click(function() {
+        var columnId = $(this).data('column-id');
+        var isFormula = $(this).data('is-formula');
+        
+        // Populate form
+        $.get('{% url "report:get_column" %}?id=' + columnId, function(data) {
+            var form = $('#columnConfigForm');
+            form.find('[name="column_id"]').val(data.id);
+            form.find('[name="display_name"]').val(data.display_name);
+            form.find('[name="formula"]').val(data.formula);
+            form.find('[name="aggregation"]').val(data.aggregation);
+            form.find('[name="is_visible"]').prop('checked', data.is_visible);
+            toggleFormulaSection(data.is_formula);
+        });
+        
+        $('#columnConfigModal').modal('show');
+    });
+
+    // Save column configuration
+    $('#saveColumnConfig').click(function() {
+        var formData = new FormData($('#columnConfigForm')[0]);
+
+        $.ajax({
+            url: '{% url "report:update_column" %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    $('#columnConfigModal').modal('hide');
+                    refreshPreview();
+                } else {
+                    alert(response.error || 'Error updating column');
+                }
+            },
+            error: function() {
+                alert('Error updating column');
+            }
+        });
+    });
+
+    // Add these new functions for drag-and-drop, column deletion, and pagination
+    function initializeColumnDragAndDrop() {
+        const columnList = document.querySelector('.preview-table thead tr');
+        if (columnList) {
+            new Sortable(columnList, {
+                handle: '.sort-handle',
+                animation: 150,
+                onEnd: function(evt) {
+                    const columns = Array.from(evt.to.children).map(th => th.dataset.columnId);
+                    $.ajax({
+                        url: "{% url 'report:reorder_columns' report.id %}",
+                        method: 'POST',
+                        data: {
+                            columns: JSON.stringify(columns),
+                            csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                refreshPreview();
+                            }
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    // Enhanced column deletion
+    $(document).on('click', '.delete-column', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!confirm('Are you sure you want to delete this column?')) {
+            return;
+        }
+
+        const columnId = $(this).closest('th').data('column-id');
+        const fieldPath = $(this).closest('th').data('field-path');
+        
+        $.ajax({
+            url: "{% url 'report:delete_column' %}",
+            method: 'POST',
+            data: {
+                column_id: columnId,
+                field_path: fieldPath,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Enable the add field button for this field path
+                    $(`.add-field[data-field="${fieldPath}"]`).prop('disabled', false);
+                    refreshPreview();
+                }
+            }
+        });
+    });
+
+    // Enhanced pagination
+    function initializePagination() {
+        $(document).on('click', '.page-link', function(e) {
+            e.preventDefault();
+            const page = $(this).data('page');
+            if (!page) return;
+
+            // Show loading state
+            $('.preview-table-wrapper').addClass('loading').css('opacity', '0.5');
+            const spinner = $('<div class="text-center my-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
+            $('.preview-table-wrapper').append(spinner);
+
+            $.ajax({
+                url: window.location.pathname,
+                data: {
+                    page: page,
+                    ...getActiveFiltersAndSorts()
+                },
+                success: function(response) {
+                    $('.preview-container').html($(response).find('.preview-container').html());
+                    initializeTableComponents();
+                    // Update URL without reloading
+                    const url = new URL(window.location);
+                    url.searchParams.set('page', page);
+                    window.history.pushState({}, '', url);
+                },
+                complete: function() {
+                    $('.preview-table-wrapper').removeClass('loading').css('opacity', '1');
+                    spinner.remove();
+                }
+            });
+        });
+    }
+
+    // Helper function to get current filters and sorts
+    function getActiveFiltersAndSorts() {
+        const params = {};
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Add sorting parameters if they exist
+        if (urlParams.has('sort_field')) {
+            params.sort_field = urlParams.get('sort_field');
+            params.sort_direction = urlParams.get('sort_direction');
+        }
+        
+        // Add filter parameters
+        urlParams.forEach((value, key) => {
+            if (key.startsWith('filter_')) {
+                params[key] = value;
+            }
+        });
+        
+        return params;
+    }
+
+    // Initialize table components
+    function initializeTableComponents() {
+        initializeColumnDragAndDrop();
+        initializePagination();
+        $('[data-bs-toggle="tooltip"]').tooltip();
+        
+        // Re-initialize any other components you need
+        initializePreviewTableHandlers();
+    }
+
+    // Call initialization on page load
+    initializeTableComponents();
+
+    // Initialize column reordering
+    const tableHeader = document.querySelector('.preview-table thead tr');
+    if (tableHeader) {
+        new Sortable(tableHeader, {
+            animation: 150,
+            handle: '.sort-handle',
+            draggable: 'th',
+            onStart: function(evt) {
+                evt.item.classList.add('dragging');
+            },
+            onEnd: function(evt) {
+                evt.item.classList.remove('dragging');
+                
+                // Get the new column order
+                const columns = Array.from(evt.to.children).map(th => th.dataset.columnId);
+                
+                // Send the new order to the server
+                $.ajax({
+                    url: "{% url 'report:reorder_columns' report.id %}",
+                    method: 'POST',
+                    data: {
+                        columns: JSON.stringify(columns),
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Refresh the preview to show the new order
+                            location.reload();
+                        } else {
+                            alert('Error reordering columns. Please try again.');
+                        }
+                    },
+                    error: function() {
+                        alert('Error reordering columns. Please try again.');
+                    }
+                });
+            }
+        });
+    }
+
+    // Handle column deletion
+    $(document).on('click', '.remove-column', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!confirm('Are you sure you want to remove this column?')) {
+            return;
+        }
+
+        const columnId = $(this).data('column-id');
+        const th = $(this).closest('th');
+        const fieldPath = th.data('field-path');
+        
+        $.ajax({
+            url: "{% url 'report:delete_column' %}",
+            method: 'POST',
+            data: {
+                column_id: columnId,
+                csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Enable the add field button for this field path
+                    $(`.add-field[data-field="${fieldPath}"]`).prop('disabled', false);
+                    location.reload();
+                } else {
+                    alert('Error removing column. Please try again.');
+                }
+            },
+            error: function() {
+                alert('Error removing column. Please try again.');
+            }
+        });
+    });
+
+    // ... rest of your existing JavaScript code ...
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,396 @@
+{% load static %}
+
+<!-- Column Configuration Modal -->
+<div class="modal fade" id="columnConfigModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Column</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="columnConfigForm">
+                    <input type="hidden" name="column_id">
+                    
+                    <!-- Basic Settings -->
+                    <div class="mb-3">
+                        <label class="form-label">Display Name</label>
+                        <input type="text" class="form-control" name="display_name" required>
+                    </div>
+
+                    <!-- Aggregation Settings -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="enableAggregation">
+                                <label class="form-check-label" for="enableAggregation">Enable Aggregation</label>
+                            </div>
+                        </div>
+                        <div class="card-body aggregation-settings" style="display: none;">
+                            <!-- Aggregation Type Selection -->
+                            <div class="mb-3">
+                                <label class="form-label">Aggregation Type</label>
+                                <select class="form-control" name="aggregation" id="aggregationType">
+                                    <optgroup label="Basic Aggregations">
+                                        <option value="">No Aggregation</option>
+                                        <option value="COUNT">Count</option>
+                                        <option value="SUM">Sum</option>
+                                        <option value="AVG">Average</option>
+                                        <option value="MIN">Minimum</option>
+                                        <option value="MAX">Maximum</option>
+                                    </optgroup>
+                                    <optgroup label="Conditional Aggregations">
+                                        <option value="COUNT_DISTINCT">Count Distinct</option>
+                                        <option value="COUNT_IF">Count If</option>
+                                        <option value="SUM_IF">Sum If</option>
+                                    </optgroup>
+                                    <optgroup label="Statistical Aggregations">
+                                        <option value="STDDEV">Standard Deviation</option>
+                                        <option value="VARIANCE">Variance</option>
+                                        <option value="MEDIAN">Median</option>
+                                    </optgroup>
+                                    <optgroup label="Time-Based Aggregations">
+                                        <option value="MONTH_SUM">Monthly Sum</option>
+                                        <option value="YEAR_SUM">Yearly Sum</option>
+                                        <option value="YOY_GROWTH">Year over Year Growth</option>
+                                    </optgroup>
+                                    <optgroup label="Window Functions">
+                                        <option value="RUNNING_TOTAL">Running Total</option>
+                                        <option value="RANK">Rank</option>
+                                        <option value="MOVING_AVG">Moving Average</option>
+                                    </optgroup>
+                                    <optgroup label="Percentile Functions">
+                                        <option value="PERCENTILE_25">25th Percentile</option>
+                                        <option value="PERCENTILE_50">Median (50th Percentile)</option>
+                                        <option value="PERCENTILE_75">75th Percentile</option>
+                                        <option value="PERCENTILE_90">90th Percentile</option>
+                                    </optgroup>
+                                </select>
+                                <div class="form-text aggregation-description"></div>
+                            </div>
+
+                            <!-- Conditional Settings -->
+                            <div class="conditional-settings" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Condition</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" name="condition" placeholder="e.g., value > 100">
+                                        <button type="button" class="btn btn-outline-secondary" id="buildConditionBtn">
+                                            <i class="fas fa-tools"></i> Build Condition
+                                        </button>
+                                    </div>
+                                    <div class="form-text">Use field names and operators (>, <, ==, etc.) to build conditions</div>
+                                </div>
+                            </div>
+
+                            <!-- Window Function Settings -->
+                            <div class="window-settings" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Window Size</label>
+                                    <input type="number" class="form-control" name="window_size" min="1">
+                                    <div class="form-text">Number of rows to include in the window calculation</div>
+                                </div>
+                            </div>
+
+                            <!-- Time-Based Settings -->
+                            <div class="time-settings" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Time Unit</label>
+                                    <select class="form-control" name="time_unit">
+                                        <option value="DAY">Daily</option>
+                                        <option value="WEEK">Weekly</option>
+                                        <option value="MONTH">Monthly</option>
+                                        <option value="QUARTER">Quarterly</option>
+                                        <option value="YEAR">Yearly</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Preview Section -->
+                            <div class="aggregation-preview mt-3">
+                                <label class="form-label">Preview</label>
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <pre class="mb-0"><code class="preview-code">No aggregation selected</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formula Settings -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="enableFormula">
+                                <label class="form-check-label" for="enableFormula">Enable Formula</label>
+                            </div>
+                        </div>
+                        <div class="card-body formula-settings" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label">Formula</label>
+                                <div class="input-group">
+                                    <textarea class="form-control" name="formula" rows="3"></textarea>
+                                    <button type="button" class="btn btn-outline-secondary" id="insertFieldBtn">
+                                        Insert Field
+                                    </button>
+                                </div>
+                                <div class="form-text">Use field names in curly braces, e.g. {first_name} + ' ' + {last_name}</div>
+                            </div>
+
+                            <!-- Available Fields -->
+                            <div class="mb-3">
+                                <label class="form-label">Available Fields</label>
+                                <div class="available-fields">
+                                    {% for field in available_fields %}
+                                    <span class="badge bg-light text-dark me-1 mb-1 field-badge" 
+                                          data-field="{{ field.path }}"
+                                          data-bs-toggle="tooltip" 
+                                          title="{{ field.type }}">
+                                        {{ field.display_name }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Formula Preview -->
+                            <div class="formula-preview mt-3">
+                                <label class="form-label">Preview</label>
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <pre class="mb-0"><code class="preview-code">No formula entered</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visibility Settings -->
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" name="is_visible" checked>
+                        <label class="form-check-label">Show in report</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveColumnConfig">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Condition Builder Modal -->
+<div class="modal fade" id="conditionBuilderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Build Condition</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Field</label>
+                    <select class="form-control" id="conditionField">
+                        {% for field in available_fields %}
+                        <option value="{{ field.path }}">{{ field.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Operator</label>
+                    <select class="form-control" id="conditionOperator">
+                        <option value=">">&gt; Greater than</option>
+                        <option value=">=">&gt;= Greater than or equal</option>
+                        <option value="<">&lt; Less than</option>
+                        <option value="<=">&lt;= Less than or equal</option>
+                        <option value="==">== Equal to</option>
+                        <option value="!=">!= Not equal to</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Value</label>
+                    <input type="text" class="form-control" id="conditionValue">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="applyCondition">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Field Selector Modal -->
+<div class="modal fade" id="fieldSelectorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Field</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="fieldSearch" placeholder="Search fields...">
+                </div>
+                <div class="field-list">
+                    {% for group in field_groups %}
+                    <div class="field-group">
+                        <div class="field-group-header">
+                            {{ group.name }}
+                        </div>
+                        <div class="field-items">
+                            {% for field in group.fields %}
+                            <div class="field-item" data-field="{{ field.path }}">
+                                <div class="field-info">
+                                    <i class="fas {{ field.icon }} me-2"></i>
+                                    <span class="field-name">{{ field.display_name }}</span>
+                                    <small class="text-muted ms-2">{{ field.type }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Field badges */
+.field-badge {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.field-badge:hover {
+    background-color: #e9ecef !important;
+}
+
+/* Field list */
+.field-group-header {
+    padding: 0.5rem 1rem;
+    background-color: #f8f9fa;
+    font-weight: 500;
+    cursor: pointer;
+}
+.field-items {
+    padding: 0.5rem 0;
+}
+.field-item {
+    padding: 0.375rem 1rem;
+    cursor: pointer;
+}
+.field-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Preview sections */
+.preview-code {
+    font-family: monospace;
+    white-space: pre-wrap;
+    color: #666;
+}
+
+/* Tooltips */
+.aggregation-description {
+    margin-top: 0.5rem;
+    font-style: italic;
+    color: #666;
+}
+</style>
+
+<script>
+const AGGREGATION_DESCRIPTIONS = {
+    'COUNT': 'Counts the number of rows',
+    'SUM': 'Calculates the sum of values',
+    'AVG': 'Calculates the average (mean) of values',
+    'MIN': 'Finds the minimum value',
+    'MAX': 'Finds the maximum value',
+    'COUNT_DISTINCT': 'Counts unique values only',
+    'COUNT_IF': 'Counts rows that match a condition',
+    'SUM_IF': 'Sums values that match a condition',
+    'STDDEV': 'Calculates the standard deviation',
+    'VARIANCE': 'Calculates the variance',
+    'MEDIAN': 'Finds the middle value',
+    'MONTH_SUM': 'Sums values by month',
+    'YEAR_SUM': 'Sums values by year',
+    'YOY_GROWTH': 'Calculates year-over-year growth percentage',
+    'RUNNING_TOTAL': 'Calculates cumulative sum',
+    'RANK': 'Assigns rank based on value',
+    'MOVING_AVG': 'Calculates moving average over a window',
+    'PERCENTILE_25': 'Finds the value at 25th percentile',
+    'PERCENTILE_50': 'Finds the value at 50th percentile (median)',
+    'PERCENTILE_75': 'Finds the value at 75th percentile',
+    'PERCENTILE_90': 'Finds the value at 90th percentile'
+};
+
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+
+    // Update aggregation description
+    $('#aggregationType').change(function() {
+        const type = $(this).val();
+        const description = AGGREGATION_DESCRIPTIONS[type] || '';
+        $('.aggregation-description').text(description);
+        updateAggregationPreview();
+    });
+
+    // Update formula preview
+    $('[name="formula"]').on('input', updateFormulaPreview);
+
+    // Field badge click
+    $('.field-badge').click(function() {
+        const field = $(this).data('field');
+        insertFieldAtCursor(field);
+    });
+
+    function insertFieldAtCursor(field) {
+        const textarea = $('[name="formula"]')[0];
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const before = text.substring(0, start);
+        const after = text.substring(end);
+        textarea.value = before + '{' + field + '}' + after;
+        textarea.selectionStart = textarea.selectionEnd = start + field.length + 2;
+        updateFormulaPreview();
+    }
+
+    function updateFormulaPreview() {
+        const formula = $('[name="formula"]').val();
+        if (formula) {
+            $('.formula-preview .preview-code').text(formula);
+        } else {
+            $('.formula-preview .preview-code').text('No formula entered');
+        }
+    }
+
+    function updateAggregationPreview() {
+        const type = $('#aggregationType').val();
+        const condition = $('[name="condition"]').val();
+        const windowSize = $('[name="window_size"]').val();
+        const timeUnit = $('[name="time_unit"]').val();
+
+        let preview = 'No aggregation selected';
+        if (type) {
+            preview = `Type: ${type}\n`;
+            if (condition) {
+                preview += `Condition: ${condition}\n`;
+            }
+            if (windowSize) {
+                preview += `Window Size: ${windowSize}\n`;
+            }
+            if (timeUnit) {
+                preview += `Time Unit: ${timeUnit}`;
+            }
+        }
+        $('.aggregation-preview .preview-code').text(preview);
+    }
+
+    // Monitor all aggregation-related inputs for preview updates
+    $('.aggregation-settings input, .aggregation-settings select').on('change input', updateAggregationPreview);
+});
+</script> 

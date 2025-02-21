@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% load report_tags %}
+
+{% block extra_css %}
+<style>
+    /* Add Excel-like styling */
+    .report-table th {
+        position: relative;
+        padding-right: 20px;
+        cursor: pointer;
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .report-table th:hover {
+        background-color: #e9ecef;
+    }
+
+    .sort-icon {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.5;
+    }
+
+    .sort-icon.active {
+        opacity: 1;
+    }
+
+    .group-row {
+        cursor: pointer;
+        background-color: #f8f9fa;
+        font-weight: 500;
+    }
+
+    .group-row:hover {
+        background-color: #e9ecef !important;
+    }
+
+    .group-row td {
+        border-top: 2px solid #dee2e6;
+    }
+
+    .group-toggle {
+        transition: transform 0.2s;
+        margin-right: 8px;
+    }
+
+    .group-row.collapsed .group-toggle {
+        transform: rotate(-90deg);
+    }
+
+    .detail-row {
+        background-color: #ffffff;
+    }
+
+    .subtotal-row {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .grand-total {
+        background-color: #e9ecef;
+        font-weight: bold;
+        border-top: 2px solid #dee2e6;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .badge {
+        margin-left: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4>{{ report.name }}</h4>
+        <div>
+            <a href="?export=excel" class="btn btn-outline-success me-2">
+                <i class="fas fa-file-excel"></i> Export to Excel
+            </a>
+            <button class="btn btn-outline-secondary me-2" onclick="window.print()">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="{% url 'report:report_builder' report.id %}" class="btn btn-outline-primary">
+                <i class="fas fa-edit"></i> Edit Report
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered report-table">
+            <thead>
+                <tr>
+                    {% for column in columns %}
+                        {% if column.is_visible %}
+                            <th data-field="{{ column.field_path }}" class="sortable-header">
+                                {{ column.display_name }}
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in preview_data %}
+                    {% if row.is_group_row %}
+                        <tr class="group-row" data-group-level="{{ row.group_level }}">
+                            {% for column in columns %}
+                                {% if column.is_visible %}
+                                    <td style="padding-left: {{ row.group_level|add:1 }}rem">
+                                        {% if forloop.first %}
+                                            <i class="fas fa-chevron-down group-toggle"></i>
+                                            {{ row|get_dict_value:column.field_path|default:'(None)' }}
+                                            <span class="badge bg-secondary">{{ row.record_count|default:0 }} records</span>
+                                        {% else %}
+                                            {% if column.aggregation %}
+                                                {{ row|get_dict_value:column.field_path|default_if_none:"N/A" }}
+                                            {% else %}
+                                                {{ row|get_dict_value:column.field_path|default:'(None)' }}
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    {% elif row.is_subtotal %}
+                        <tr class="subtotal-row">
+                            {% for column in columns %}
+                                {% if column.is_visible %}
+                                    <td>
+                                        {% if forloop.first %}
+                                            Subtotal
+                                        {% elif column.aggregation %}
+                                            {{ row|get_dict_value:column.field_path|default_if_none:"N/A" }}
+                                        {% else %}
+                                            &nbsp;
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    {% else %}
+                        <tr class="detail-row" data-group-level="{{ row.group_level }}">
+                            {% for column in columns %}
+                                {% if column.is_visible %}
+                                    <td style="padding-left: {{ row.group_level|add:2 }}rem">
+                                        {{ row|get_dict_value:column.field_path|default:'' }}
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    {% endif %}
+                {% empty %}
+                    <tr>
+                        <td colspan="{{ columns.filter.is_visible.count }}" class="text-center">
+                            No data available
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            {% if preview_data.grand_totals %}
+                <tfoot>
+                    <tr class="table-info">
+                        {% for column in columns %}
+                            {% if column.is_visible %}
+                                <td>
+                                    {% if forloop.first %}
+                                        Grand Total
+                                    {% elif column.field_path in preview_data.grand_totals %}
+                                        {{ preview_data.grand_totals|get_dict_value:column.field_path|default_if_none:"N/A" }}
+                                    {% else %}
+                                        &nbsp;
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                </tfoot>
+            {% endif %}
+        </table>
+    </div>
+
+    <!-- Add page size selector -->
+    <div class="d-flex align-items-center mb-3">
+        <label class="me-2">Show entries:</label>
+        <select class="form-select form-select-sm" id="pageSizeSelect" style="width: auto;">
+            <option value="10" {% if request.GET.page_size == '10' or not request.GET.page_size %}selected{% endif %}>10</option>
+            <option value="25" {% if request.GET.page_size == '25' %}selected{% endif %}>25</option>
+            <option value="50" {% if request.GET.page_size == '50' %}selected{% endif %}>50</option>
+            <option value="100" {% if request.GET.page_size == '100' %}selected{% endif %}>100</option>
+        </select>
+    </div>
+
+    <!-- Pagination controls -->
+    {% if preview_data.paginator.num_pages > 1 %}
+    <div class="pagination-controls mt-3 d-flex justify-content-between align-items-center">
+        <div class="pagination-info">
+            Showing {{ preview_data.start_index }} to {{ preview_data.end_index }} of {{ preview_data.paginator.count }} entries
+        </div>
+        <nav aria-label="Table navigation">
+            <ul class="pagination mb-0">
+                {% if preview_data.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="#" data-page="{{ preview_data.previous_page_number }}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for num in preview_data.paginator.page_range %}
+                    {% if num == preview_data.number %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% elif num > preview_data.number|add:'-3' and num < preview_data.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" data-page="{{ num }}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if preview_data.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="#" data-page="{{ preview_data.next_page_number }}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Function to update URL parameters
+    function updateUrlParameter(key, value, url) {
+        const urlParams = new URLSearchParams(url || window.location.search);
+        urlParams.set(key, value);
+        return urlParams.toString();
+    }
+
+    // Handle page size changes
+    $('#pageSizeSelect').change(function() {
+        const pageSize = $(this).val();
+        const newUrl = updateUrlParameter('page_size', pageSize);
+        // Reset to page 1 when changing page size
+        window.location.search = updateUrlParameter('page', '1', newUrl);
+    });
+
+    // Handle pagination clicks
+    $('.page-link').click(function(e) {
+        e.preventDefault();
+        const page = $(this).data('page');
+        if (page) {
+            const currentParams = new URLSearchParams(window.location.search);
+            const pageSize = currentParams.get('page_size') || '10';
+            const sortField = currentParams.get('sort_field') || '';
+            const sortDirection = currentParams.get('sort_direction') || '';
+            
+            let newUrl = updateUrlParameter('page', page);
+            if (pageSize) newUrl = updateUrlParameter('page_size', pageSize, newUrl);
+            if (sortField) newUrl = updateUrlParameter('sort_field', sortField, newUrl);
+            if (sortDirection) newUrl = updateUrlParameter('sort_direction', sortDirection, newUrl);
+            
+            window.location.search = newUrl;
+        }
+    });
+
+    // Handle sorting
+    $('.sortable-header').click(function() {
+        const field = $(this).data('field');
+        const currentSort = $(this).find('.sort-icon').attr('class');
+        let direction = 'asc';
+        
+        if (currentSort.includes('fa-sort-up')) {
+            direction = 'desc';
+            $(this).find('.sort-icon').removeClass('fa-sort-up').addClass('fa-sort-down');
+        } else if (currentSort.includes('fa-sort-down')) {
+            $(this).find('.sort-icon').removeClass('fa-sort-down').addClass('fa-sort');
+        } else {
+            direction = 'asc';
+            $(this).find('.sort-icon').removeClass('fa-sort').addClass('fa-sort-up');
+        }
+        
+        // Update URL parameters and reload
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('sort_field', field);
+        urlParams.set('sort_direction', direction);
+        window.location.search = urlParams.toString();
+    });
+
+    // Handle group toggling
+    $('.group-toggle').click(function(e) {
+        e.stopPropagation();
+        const groupRow = $(this).closest('tr');
+        const groupLevel = parseInt(groupRow.data('group-level'));
+        const isExpanded = $(this).hasClass('fa-chevron-down');
+        
+        // Toggle chevron
+        $(this).toggleClass('fa-chevron-down fa-chevron-up');
+        
+        // Find all following rows until next group of same or higher level
+        let currentRow = groupRow.next();
+        while (currentRow.length) {
+            const rowGroupLevel = parseInt(currentRow.data('group-level'));
+            
+            // Stop if we hit a group row of same or higher level
+            if (currentRow.hasClass('group-row') && rowGroupLevel <= groupLevel) {
+                break;
+            }
+            
+            // Toggle visibility based on group state
+            if (isExpanded) {
+                currentRow.hide();
+            } else {
+                // Only show direct children when expanding
+                if (!currentRow.hasClass('group-row') || rowGroupLevel === groupLevel + 1) {
+                    currentRow.show();
+                }
+            }
+            
+            currentRow = currentRow.next();
+        }
+    });
+});
+</script>
+{% endblock %} 
